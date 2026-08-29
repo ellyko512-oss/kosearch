@@ -48,7 +48,7 @@
   .wrap{ position:relative; z-index:1; max-width:720px; margin:0 auto; }
 
   /* ---------- 제출 페이지 헤더 ---------- */
-  .pagehead{ margin-bottom:28px; text-align:center; }
+  .pagehead{ margin-bottom:34px; text-align:center; }
   .kicker{
     display:inline-block; font-size:11px; font-weight:800; letter-spacing:.06em;
     background:var(--grad); -webkit-background-clip:text; background-clip:text; color:transparent;
@@ -56,14 +56,15 @@
   }
   .pagehead h1{ margin:0 0 8px; font-size:26px; font-weight:800; letter-spacing:-.02em; line-height:1.3; }
   .pagehead p{ margin:0 auto; font-size:13.5px; color:var(--ink-2); line-height:1.7; max-width:56ch; }
-  .metarow{ display:flex; flex-wrap:wrap; justify-content:center; gap:6px; margin-top:16px; }
-  .metachip{
-    font-size:11px; font-weight:700; color:var(--ink-2); background:#fff;
-    border:1px solid var(--line); border-radius:999px; padding:5px 11px;
-  }
 
   /* ---------- 2단 레이아웃 ---------- */
   .layout{ display:flex; justify-content:center; }
+
+  .notice{
+    max-width:44ch; margin:30px auto 0; text-align:center;
+    font-size:11.5px; line-height:1.75; color:var(--muted);
+    word-break:keep-all; /* 한글 단어가 중간에서 잘리지 않도록 */
+  }
   .stage{ display:flex; flex-direction:column; align-items:center; }
 
   /* ---------- 폰 프레임 ---------- */
@@ -180,6 +181,32 @@
     padding:11px 15px; font-size:12px; color:var(--ink-2); line-height:1.45;
   }
 
+  /* ---------- 결과 생성 중 표시 ---------- */
+  .thinking{
+    display:none; align-items:center; gap:9px;
+    padding:2px 4px 16px; font-size:12px; color:var(--ink-2);
+  }
+  .thinking.show{ display:flex; }
+  .thinking .spinner{
+    flex:0 0 auto; width:15px; height:15px; border-radius:50%;
+    background: conic-gradient(from 0deg, var(--g1), var(--g2), var(--g3), var(--g4), var(--g5), var(--g1));
+    -webkit-mask: radial-gradient(circle, transparent 54%, #000 56%);
+            mask: radial-gradient(circle, transparent 54%, #000 56%);
+    animation: spin .85s linear infinite;
+  }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+
+  /* 단계별 등장 */
+  .reveal{ opacity:0; transform:translateY(10px); pointer-events:none; }
+  .reveal.in{
+    opacity:1; transform:none; pointer-events:auto;
+    transition: opacity .38s ease, transform .38s cubic-bezier(.22,.68,0,1);
+  }
+  @media (prefers-reduced-motion: reduce){
+    .thinking .spinner{ animation-duration:2s; }
+    .reveal.in{ transition:none; }
+  }
+
   .card{
     background:var(--card); border:1px solid var(--line); border-radius:var(--radius);
     padding:14px 16px; margin-bottom:12px;
@@ -281,6 +308,38 @@
   .loophint{ font-size:10.5px; color:var(--muted); text-align:center; margin-bottom:8px; }
   footer.credit{ font-size:11px; color:var(--muted); margin-top:6px; text-align:center; }
 
+  /* ---------- 클릭 지점 안내 (손 커서) ---------- */
+  .tap-hint{
+    position:absolute; width:0; height:0; z-index:20;
+    pointer-events:none; opacity:0; transition:opacity .32s ease;
+  }
+  .tap-hint.show{ opacity:1; }
+  .tap-hint.offscreen{ opacity:0; }   /* 대상이 스크롤로 화면 밖에 나가면 숨김 */
+  .tap-hint .ripple{
+    position:absolute; left:-12px; top:-12px; width:24px; height:24px;
+    border-radius:50%; background:rgba(30,132,255,.34);
+    animation: hint-ripple 1.8s ease-out infinite;
+  }
+  .tap-hint .cursor{
+    /* viewBox 24 기준 화살표 끝이 (5.5, 3.2) → 18px 스케일에서 (4, 2.4) */
+    position:absolute; left:-4px; top:-2px; width:18px; height:18px;
+    animation: hint-click 1.8s ease-in-out infinite;
+    filter: drop-shadow(0 2px 4px rgba(20,25,40,.35));
+  }
+  @keyframes hint-click{
+    0%, 100%{ transform: translate(2.5px, 2.5px); }
+    38%, 58%{ transform: translate(0, 0); }
+  }
+  @keyframes hint-ripple{
+    0%, 34%  { transform: scale(.35); opacity:0; }
+    42%      { transform: scale(.35); opacity:.6; }
+    80%, 100%{ transform: scale(1.55); opacity:0; }
+  }
+  @media (prefers-reduced-motion: reduce){
+    .tap-hint .cursor{ animation:none; }
+    .tap-hint .ripple{ animation:none; opacity:.45; transform:scale(.9); }
+  }
+
   .toast{
     position:absolute; left:50%; bottom:22px; transform:translate(-50%,20px);
     background:#16181D; color:#fff; font-size:11.5px; font-weight:600;
@@ -374,14 +433,8 @@
     <h1>쇼핑, 다음을 이어주는 검색</h1>
     <p>
       상품을 찾아주는 것에서 멈추지 않고, 구매 이후의 행동까지 이어주는 검색 경험을 제안합니다.
-      아래 프로토타입은 실제로 클릭해서 <b>홈 → AI 검색 → 결과 → 구매 → 로컬 연결</b>의 5단계 흐름을 확인할 수 있습니다.
+      아래 프로토타입은 실제로 클릭해서 연결의 흐름을 확인할 수 있습니다.
     </p>
-    <div class="metarow">
-      <span class="metachip">클릭 가능한 프로토타입</span>
-      <span class="metachip">390 × 844 (iPhone 기준)</span>
-      <span class="metachip">HTML / CSS / Vanilla JS</span>
-      <span class="metachip">의존성 없음</span>
-    </div>
   </div>
 
   <div class="layout">
@@ -418,8 +471,8 @@
             <div class="intro-top">
               <svg class="mark lg"><use href="#sym-mark"/></svg>
               <p class="intro-h1">
-                찾으시는 상품에 대해 물어보세요.<br>
-                가격, 기능, 상황을 조건으로 자유롭게 말씀해주세요.<br>
+                찾으시는 상품에 대해 입력해 보세요.<br>
+                가격, 기능, 상황을 조건으로 자유롭게 입력하시면,<br>
                 상품을 찾는 것에서 그치지 않고, 다음까지 이어드릴게요.
               </p>
             </div>
@@ -446,6 +499,11 @@
                   <svg class="mark" style="width:16px;height:16px;margin-top:1px"><use href="#sym-mark"/></svg>
                   <span>초보자가 신을만한 러닝화 구매하려고 해 근데, 무릎이 아프지 말아야 하고 가격은 10만 원 중후반대로 골라줘</span>
                 </span>
+              </div>
+
+              <div class="thinking" id="thinking">
+                <span class="spinner"></span>
+                <span id="thinkingText">조건을 분석하고 있어요</span>
               </div>
 
               <div class="card">
@@ -482,7 +540,7 @@
                   <div class="reason">쿠셔닝 등급 최상급, 초보자 안정화 구조로 무릎 부담을 줄여줘요</div>
                   <div class="footer-row">
                     <div class="src">출처 · 상품 스펙 / 판매처 ↗</div>
-                    <button class="buybtn" onclick="openPurchaseModal('A사 안정화 러닝화 3세대','168,000원')">바로구매</button>
+                    <button class="buybtn" onclick="openPurchaseModal('a','A사 안정화 러닝화 3세대','168,000원')">바로구매</button>
                   </div>
                 </div>
               </div>
@@ -496,7 +554,7 @@
                   <div class="reason">두꺼운 쿠셔닝으로 착지 충격을 흡수, 안정화 보정 기능 포함</div>
                   <div class="footer-row">
                     <div class="src">출처 · 상품 스펙 / 판매처 ↗</div>
-                    <button class="buybtn" onclick="openPurchaseModal('B사 쿠션 러닝화','175,000원')">바로구매</button>
+                    <button class="buybtn" onclick="openPurchaseModal('b','B사 쿠션 러닝화','175,000원')">바로구매</button>
                   </div>
                 </div>
               </div>
@@ -510,7 +568,7 @@
                   <div class="reason">가볍고 안정적인 초보자용 구조, 예산 안에서 균형 잡힌 선택</div>
                   <div class="footer-row">
                     <div class="src">출처 · 상품 스펙 / 판매처 ↗</div>
-                    <button class="buybtn" onclick="openPurchaseModal('C사 입문용 러닝화','165,000원')">바로구매</button>
+                    <button class="buybtn" onclick="openPurchaseModal('c','C사 입문용 러닝화','165,000원')">바로구매</button>
                   </div>
                 </div>
               </div>
@@ -530,21 +588,8 @@
                 <div class="local-inner">
                   <div class="crossbadge">쇼핑 → 로컬로 이어졌어요</div>
                   <div class="local-title">이 신발로 뛰기 좋은 코스</div>
-                  <div class="local-sub">고른 러닝화 기준으로 초보자에게 부담 없는 코스를 골랐어요</div>
-
-                  <div class="course">
-                    <div class="maptag"><svg viewBox="0 0 300 74"><path d="M10 55 Q 80 15, 150 40 T 290 20" stroke="#1E84FF" stroke-width="3" fill="none" stroke-linecap="round"/></svg></div>
-                    <div class="cname">노들섬 러닝 코스</div>
-                    <div class="cmeta"><span>4.2km</span><span>난이도 쉬움</span><span>평지 위주</span></div>
-                    <div class="cnote">그늘이 많고 노면이 평탄해 무릎 부담이 적은 입문자 추천 코스예요</div>
-                  </div>
-
-                  <div class="course">
-                    <div class="maptag"><svg viewBox="0 0 300 74"><path d="M10 20 Q 90 60, 160 30 T 290 50" stroke="#1E84FF" stroke-width="3" fill="none" stroke-linecap="round"/></svg></div>
-                    <div class="cname">여의도 벚꽃길 코스</div>
-                    <div class="cmeta"><span>5.5km</span><span>난이도 쉬움</span><span>야간 조명 좋음</span></div>
-                    <div class="cnote">완전 평지 코스라 착지 충격이 적고, 밤에도 안전하게 뛸 수 있어요</div>
-                  </div>
+                  <div class="local-sub" id="localSub"></div>
+                  <div id="courseList"></div>
 
                   <button class="loopcta"><span>완주하고 인증샷 남기기</span></button>
                   <div class="loophint">완주 인증은 루프 탭에서 공유할 수 있어요</div>
@@ -554,6 +599,15 @@
             </div>
           </div>
 
+
+          <!-- 클릭 지점 안내용 손 커서 -->
+          <div class="tap-hint" id="tapHint" aria-hidden="true">
+            <span class="ripple"></span>
+            <svg class="cursor" viewBox="0 0 24 24">
+              <path d="M5.5 3.2 5.5 19.4 9.9 15.4 12.6 21.3 15.4 20 12.7 14.3 18.6 14Z"
+                    fill="#16181D" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/>
+            </svg>
+          </div>
         </div>
 
         <div class="toast" id="toast">인증 챌린지로 연결돼요 (데모)</div>
@@ -566,6 +620,12 @@
     </div>
 
   </div>
+
+  <p class="notice">
+    과제 제출 목적의 프로토타입 컨셉 시안입니다.
+    본 페이지는 실제 서비스와 무관한 비공식 제안물입니다.
+    상품명 / 가격 / 후기 수치는 모두 예시용 더미 데이터입니다.
+  </p>
 </div>
 
 <script>
@@ -577,8 +637,131 @@
   function goToPage(id){
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
     document.getElementById(id).classList.add('active');
+    hideHint();
     if (id === 'screen-intro') startTyping(); else stopTyping();
+    // 인트로는 타이핑이 끝난 뒤에 힌트를 띄웁니다 (startTyping 내부에서 호출)
+    if (id === 'screen-home')   showHint(document.getElementById('goIntro'), 700);
+    if (id === 'screen-search') runSearchSequence();   // 결과는 단계별로 생성
+    else clearSearchSeq();
   }
+
+  /* ---- 검색 결과 생성 연출 ----
+     조건 분석 → 상품 탐색 순으로 블록이 하나씩 나타납니다. */
+  const searchArea = document.querySelector('#screen-search .scroll-area');
+  const thinking = document.getElementById('thinking');
+  const thinkingText = document.getElementById('thinkingText');
+  const condRows = [...document.querySelectorAll('#screen-search .cond-row')];
+
+  // 검색바 · 생성중 표시 · 로컬 섹션을 뺀 나머지 블록이 순차 등장 대상
+  const revealBlocks = [...searchArea.children].filter(el =>
+    !el.classList.contains('searchbar') && el.id !== 'thinking' && el.id !== 'localSection');
+  revealBlocks.forEach(el => el.classList.add('reveal'));
+  condRows.forEach(el => el.classList.add('reveal'));
+
+  let seqTimers = [];
+  function clearSearchSeq(){
+    seqTimers.forEach(clearTimeout);
+    seqTimers = [];
+    thinking.classList.remove('show');
+  }
+  function at(ms, fn){ seqTimers.push(setTimeout(fn, ms)); }
+
+  // 새로 나타난 블록이 화면 아래로 넘어가면, 그만큼만 따라 내려갑니다
+  function followScroll(el){
+    if (!el) return;
+    const overflow = el.getBoundingClientRect().bottom
+                   - (searchArea.getBoundingClientRect().bottom - 16);
+    if (overflow > 0) {
+      searchArea.scrollTo({
+        top: searchArea.scrollTop + overflow,
+        behavior: reduceMotion ? 'auto' : 'smooth'
+      });
+    }
+  }
+
+  // 등장 + 따라가기
+  const show = el => { if (el) { el.classList.add('in'); followScroll(el); } };
+
+  // 힌트는 지금 보이는 바로구매 버튼에 붙입니다 (스크롤이 내려가 있을 수 있으므로)
+  function visibleBuyBtn(){
+    const sa = searchArea.getBoundingClientRect();
+    const btns = [...document.querySelectorAll('#screen-search .buybtn')];
+    return btns.find(b => {
+      const r = b.getBoundingClientRect();
+      return r.top > sa.top + 8 && r.bottom < sa.bottom - 8;
+    }) || btns[0];
+  }
+
+  function runSearchSequence(){
+    clearSearchSeq();
+    searchArea.scrollTop = 0;
+    revealBlocks.forEach(el => el.classList.remove('in'));
+    condRows.forEach(el => el.classList.remove('in'));
+    localSection.classList.remove('revealed');   // 다시 검색하면 로컬 섹션도 접습니다
+
+    if (reduceMotion){                            // 모션 최소화 설정이면 즉시 완성
+      revealBlocks.forEach(show); condRows.forEach(show);
+      showHint(visibleBuyBtn(), 400);
+      return;
+    }
+
+    thinkingText.textContent = '조건을 분석하고 있어요';
+    thinking.classList.add('show');
+
+    const [card, myLabel, myChips, srcLabel, p1, p2, p3, critLabel, critChips, note] = revealBlocks;
+
+    at(900,  () => show(card));
+    condRows.forEach((row, i) => at(1000 + i * 400, () => show(row)));
+
+    at(2300, () => { thinkingText.textContent = '조건에 맞는 상품을 찾고 있어요'; });
+    at(2450, () => { show(myLabel); show(myChips); });
+    at(2750, () => show(srcLabel));
+    at(3050, () => show(p1));
+    at(3400, () => show(p2));
+    at(3750, () => show(p3));
+    at(4100, () => { show(critLabel); show(critChips); });
+    at(4350, () => { show(note); thinking.classList.remove('show'); });
+    at(4700, () => showHint(visibleBuyBtn(), 0));
+  }
+
+  /* ---- 클릭 지점 안내 (손 커서) ---- */
+  const hintEl = document.getElementById('tapHint');
+  const viewportEl = document.querySelector('.viewport');
+  let hintTarget = null, hintTimer = null;
+
+  function hideHint(){
+    clearTimeout(hintTimer); hintTimer = null;
+    hintTarget = null;
+    hintEl.classList.remove('show');
+  }
+
+  function showHint(target, delay){
+    clearTimeout(hintTimer);
+    hintEl.classList.remove('show');
+    hintTarget = null;
+    if (!target) return;
+    hintTimer = setTimeout(() => {
+      hintTarget = target;
+      positionHint();
+      hintEl.classList.add('show');
+    }, delay);
+  }
+
+  function positionHint(){
+    if (!hintTarget) return;
+    const vp = viewportEl.getBoundingClientRect();
+    const t  = hintTarget.getBoundingClientRect();
+    // 요소 우하단 안쪽에 커서 끝을 두고, 화살표는 바깥쪽(오른쪽 아래)으로 뻗습니다
+    hintEl.style.left = (t.right  - 13 - vp.left) + 'px';
+    hintEl.style.top  = (t.bottom -  9 - vp.top)  + 'px';
+    // 대상이 스크롤로 화면 밖에 나가면 힌트도 감춥니다
+    const visible = t.bottom > vp.top + 10 && t.top < vp.bottom - 10;
+    hintEl.classList.toggle('offscreen', !visible);
+  }
+
+  document.querySelectorAll('.scroll-area').forEach(el =>
+    el.addEventListener('scroll', positionHint, { passive:true }));
+  window.addEventListener('resize', positionHint);
 
   /* ---- 인트로 검색창 타이핑 인터랙션 ---- */
   const typedEl = document.getElementById('typedQuery');
@@ -599,6 +782,7 @@
     if (reduceMotion){                       // 모션 최소화 설정이면 즉시 완성
       typedEl.textContent = QUERY;
       caretEl.classList.add('on');
+      showHint(document.getElementById('goResults'), 350);
       return;
     }
     typedEl.textContent = '';
@@ -607,7 +791,10 @@
     typeDelay = setTimeout(() => {
       typeTimer = setInterval(() => {
         typedEl.textContent = QUERY.slice(0, ++i);
-        if (i >= QUERY.length) stopTyping();
+        if (i >= QUERY.length){
+          stopTyping();
+          showHint(document.getElementById('goResults'), 350);
+        }
       }, CHAR_MS);
     }, START_MS);
   }
@@ -625,7 +812,66 @@
     if(e.target.closest('.loopcta')) showToast();
   });
 
-  function openPurchaseModal(productName, price){
+  /* ---- 상품별 추천 코스 ----
+     구매한 러닝화의 특성(쿠셔닝 / 무게 / 안정화)에 따라 이어지는 코스가 달라집니다. */
+  const COURSES = {
+    a: {
+      sub: '쿠셔닝 최상급 · 안정화 구조 기준으로 무릎 부담이 가장 적은 코스를 골랐어요',
+      items: [
+        { name:'노들섬 러닝 코스', meta:['4.2km','난이도 쉬움','평지 위주'],
+          note:'그늘이 많고 노면이 평탄해 무릎 부담이 적은 입문자 추천 코스예요',
+          path:'M10 55 Q 80 15, 150 40 T 290 20' },
+        { name:'여의도 한강공원 코스', meta:['5.5km','난이도 쉬움','야간 조명 좋음'],
+          note:'완전 평지라 착지 충격이 적고, 밤에도 안전하게 뛸 수 있어요',
+          path:'M10 20 Q 90 60, 160 30 T 290 50' }
+      ]
+    },
+    b: {
+      sub: '두꺼운 쿠셔닝 기준으로 노면이 바뀌는 조금 더 긴 코스를 골랐어요',
+      items: [
+        { name:'양재천 산책로 코스', meta:['6.0km','난이도 보통','흙길 · 우레탄 혼합'],
+          note:'노면이 중간에 바뀌어도 두꺼운 쿠셔닝이 충격을 잡아줘요',
+          path:'M10 45 Q 60 10, 120 35 Q 180 60, 230 25 T 290 40' },
+        { name:'올림픽공원 순환 코스', meta:['5.0km','난이도 보통','완만한 언덕'],
+          note:'완만한 오르내림이 있어 쿠셔닝 효과를 체감하기 좋아요',
+          path:'M10 60 Q 70 20, 130 45 Q 200 15, 290 35' }
+      ]
+    },
+    c: {
+      sub: '가벼운 무게 기준으로 처음 뛰기 좋은 짧은 코스를 골랐어요',
+      items: [
+        { name:'서울숲 순환 트랙', meta:['2.8km','난이도 아주 쉬움','순환 코스'],
+          note:'한 바퀴가 짧아 가벼운 신발로 첫 러닝 감각을 익히기 좋아요',
+          path:'M40 37 Q 40 12, 150 12 Q 260 12, 260 37 Q 260 62, 150 62 Q 40 62, 40 37' },
+        { name:'반포 한강공원 코스', meta:['4.0km','난이도 쉬움','평지 · 강변'],
+          note:'무게 부담이 없어 거리를 조금씩 늘려가기 좋은 코스예요',
+          path:'M10 40 Q 100 25, 180 45 T 290 30' }
+      ]
+    }
+  };
+
+  const localSub = document.getElementById('localSub');
+  const courseList = document.getElementById('courseList');
+
+  function renderCourses(key){
+    const data = COURSES[key] || COURSES.a;   // 알 수 없는 키면 기본값
+    localSub.textContent = data.sub;
+    courseList.innerHTML = data.items.map(c =>
+      '<div class="course">' +
+        '<div class="maptag"><svg viewBox="0 0 300 74"><path d="' + c.path +
+          '" stroke="#1E84FF" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div>' +
+        '<div class="cname">' + c.name + '</div>' +
+        '<div class="cmeta">' + c.meta.map(m => '<span>' + m + '</span>').join('') + '</div>' +
+        '<div class="cnote">' + c.note + '</div>' +
+      '</div>'
+    ).join('');
+  }
+
+  let pendingCourseKey = 'a';
+
+  function openPurchaseModal(key, productName, price){
+    pendingCourseKey = key;
+    hideHint();
     modalSheet.innerHTML =
       '<div class="modal-icon-ok">✓</div>' +
       '<div class="modal-title">구매가 완료됐어요</div>' +
@@ -640,9 +886,13 @@
     }
   }
 
+  // 최초 로드 시 홈 화면 힌트
+  showHint(document.getElementById('goIntro'), 900);
+
   function confirmPurchase(){
     modal.classList.remove('show');
     setTimeout(() => {
+      renderCourses(pendingCourseKey);          // 구매한 상품에 맞는 코스로 교체
       localSection.classList.add('revealed');
       setTimeout(() => { safeScrollIntoView(localSection); }, 120);
     }, 280);
