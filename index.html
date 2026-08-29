@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>쇼핑, 다음을 이어주는 검색 — 프로토타입</title>
+<meta name="description" content="Daum AI 쇼핑 검색 프로토타입. 검색이 구매에서 끝나지 않고 로컬 행동으로 이어지는 흐름을 다룬 클릭 가능한 시안." />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='11' fill='%231E84FF'/%3E%3C/svg%3E" />
+<style>
+  :root{
+    /* --- 브랜드 그라디언트 (디자인 시안 추출) --- */
+    --g1:#4FA4FF; --g2:#E28EFF; --g3:#FF71A4; --g4:#FFA841; --g5:#FFC236;
+    --grad: linear-gradient(100deg, var(--g1) 8.65%, var(--g2) 30.77%, var(--g3) 54.81%, var(--g4) 78.85%, var(--g5) 100%);
+    --grad-diag: linear-gradient(142deg, var(--g1) 8.65%, var(--g2) 30.77%, var(--g3) 54.81%, var(--g4) 78.85%, var(--g5) 100%);
+
+    --blue: #1E84FF;
+    --blue-dark: #0F4FB0;
+    --blue-tint: #EDF4FF;
+    --red: #E8353B;
+    --ink: #16181D;
+    --ink-2: #4B5361;
+    --muted: #8A93A3;
+    --line: #E7EAF0;
+    --ok: #1EA672;
+    --ok-tint: #E7F7F1;
+    --hold: #B08900;
+    --hold-tint: #FBF3DD;
+    --bg: #F4F5F8;
+    --card: #FFFFFF;
+    --radius: 16px;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  }
+  *{ box-sizing:border-box; }
+  html,body{
+    margin:0; padding:0; background:var(--bg);
+    font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Pretendard","Malgun Gothic",sans-serif;
+    color:var(--ink);
+    -webkit-font-smoothing:antialiased;
+  }
+  body{ min-height:100vh; padding:36px 20px 56px; }
+
+  /* 페이지 상단의 옅은 브랜드 워시 */
+  body::before{
+    content:''; position:fixed; inset:0 0 auto 0; height:340px; z-index:0;
+    background:var(--grad-diag); opacity:.07; pointer-events:none;
+  }
+
+  .wrap{ position:relative; z-index:1; max-width:720px; margin:0 auto; }
+
+  /* ---------- 제출 페이지 헤더 ---------- */
+  .pagehead{ margin-bottom:28px; text-align:center; }
+  .kicker{
+    display:inline-block; font-size:11px; font-weight:800; letter-spacing:.06em;
+    background:var(--grad); -webkit-background-clip:text; background-clip:text; color:transparent;
+    margin-bottom:8px;
+  }
+  .pagehead h1{ margin:0 0 8px; font-size:26px; font-weight:800; letter-spacing:-.02em; line-height:1.3; }
+  .pagehead p{ margin:0 auto; font-size:13.5px; color:var(--ink-2); line-height:1.7; max-width:56ch; }
+  .metarow{ display:flex; flex-wrap:wrap; justify-content:center; gap:6px; margin-top:16px; }
+  .metachip{
+    font-size:11px; font-weight:700; color:var(--ink-2); background:#fff;
+    border:1px solid var(--line); border-radius:999px; padding:5px 11px;
+  }
+
+  /* ---------- 2단 레이아웃 ---------- */
+  .layout{ display:flex; justify-content:center; }
+  .stage{ display:flex; flex-direction:column; align-items:center; }
+
+  /* ---------- 폰 프레임 ---------- */
+  .phone{
+    position:relative;
+    width:390px; max-width:100%;
+    height:844px; max-height:calc(100vh - 120px);
+    background:var(--card);
+    border-radius:38px;
+    box-shadow: 0 30px 60px rgba(20,25,40,.18), 0 2px 8px rgba(20,25,40,.08);
+    overflow:hidden;
+    border: 8px solid #14161B;
+    display:flex; flex-direction:column;
+  }
+  .statusbar{
+    flex:0 0 auto; position:relative; z-index:6;
+    display:flex; align-items:center; justify-content:space-between;
+    padding:14px 22px 6px; font-size:13px; font-weight:600; color:var(--ink);
+  }
+  .viewport{ position:relative; flex:1; overflow:hidden; }
+
+  .page{
+    position:absolute; inset:0;
+    display:flex; flex-direction:column;
+    opacity:0; pointer-events:none; transform:translateY(14px); z-index:1;
+    transition: opacity .35s ease, transform .35s cubic-bezier(.22,.68,0,1);
+  }
+  .page.active{ opacity:1; pointer-events:auto; transform:translateY(0); z-index:5; }
+
+  .backbtn{
+    width:32px; height:32px; border-radius:50%; border:none; flex:0 0 auto;
+    display:flex; align-items:center; justify-content:center;
+    font-size:17px; color:var(--ink); cursor:pointer; font-family:inherit;
+  }
+
+  /* ---------- 공용: 그라디언트 테두리 pill ---------- */
+  .gradpill{
+    display:block; width:100%; border:none; padding:1.5px; border-radius:999px;
+    background:var(--grad); font-family:inherit; cursor:pointer; text-align:left;
+    box-shadow: 0 4px 14px rgba(20,25,40,.06);
+  }
+  .gradpill > .inner{
+    display:flex; align-items:center; gap:10px;
+    background:#fff; border-radius:999px; padding:12px 16px;
+  }
+  .gradpill.lg{ padding:2.25px; box-shadow: 0 12px 30px rgba(20,25,40,.13); }
+  .gradpill.lg > .inner{ padding:13px 17px; gap:11px; }
+
+  .mark{ flex:0 0 auto; width:22px; height:22px; display:block; }
+  .mark.lg{ width:53px; height:53px; }
+  .micicon{ flex:0 0 auto; width:15px; height:19px; display:block; opacity:.9; }
+  .pill-text{ flex:1; min-width:0; font-size:12.5px; color:var(--muted); }
+  .pill-text.q{
+    font-size:11.5px; color:var(--ink-2); line-height:1.45;
+    min-height:2.9em; /* 2줄 분량을 미리 확보해 타이핑 중 레이아웃이 흔들리지 않게 */
+  }
+  .caret{
+    display:inline-block; width:1.5px; height:1em; margin-left:1.5px;
+    background:var(--ink); vertical-align:-1px; opacity:0;
+    border-radius:1px;
+  }
+  .caret.on{ animation: caret-blink .9s steps(1, end) infinite; }
+  @keyframes caret-blink{ 0%,49%{ opacity:.85 } 50%,100%{ opacity:0 } }
+  @media (prefers-reduced-motion: reduce){
+    .caret.on{ animation:none; opacity:.85; }
+  }
+  .pill-text.fade{
+    white-space:nowrap; overflow:hidden;
+    -webkit-mask-image:linear-gradient(90deg,#000 78%,transparent 100%);
+    mask-image:linear-gradient(90deg,#000 78%,transparent 100%);
+  }
+
+  /* ---------- 1. 홈 ---------- */
+  #screen-home{ background:var(--card); padding: 0 27px; justify-content:center; }
+  .home-inner{ transform:translateY(-8%); }
+  .wordmark{
+    font-weight:800; letter-spacing:-.045em; line-height:1;
+    color:#16181D; /* 글자별 색이 적용되기 전 폴백 */
+    font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Pretendard",sans-serif;
+  }
+  .wordmark span:nth-child(1){ color:#1E84FF; } /* D */
+  .wordmark span:nth-child(2){ color:#18BB68; } /* a */
+  .wordmark span:nth-child(3){ color:#FDA313; } /* u */
+  .wordmark span:nth-child(4){ color:#F95F65; } /* m */
+  .home-wordmark{ display:block; text-align:center; font-size:30px; margin:0 auto 32px; }
+
+  /* ---------- 2. 인트로 (AI 검색) ---------- */
+  #screen-intro{ background:#fff; padding: 14px 22px 22px; justify-content:space-between; }
+  #screen-intro::before{
+    content:''; position:absolute; inset:0; background:var(--grad-diag); opacity:.10; pointer-events:none;
+  }
+  #screen-intro > *{ position:relative; z-index:1; }
+  .intro-back{ background: rgba(255,255,255,.72); margin-bottom:9%; }
+  .intro-top .mark.lg{ margin:0 0 26px; }
+  .intro-h1{
+    font-size:14px; font-weight:700; line-height:2.0; letter-spacing:-.015em; color:var(--ink); margin:0;
+  }
+  .intro-disclaimer{ font-size:9.5px; color:rgba(22,24,29,.48); text-align:center; margin-top:11px; }
+
+  /* ---------- 3. 검색 결과 ---------- */
+  #screen-search{ background:var(--card); }
+  .header-row{ flex:0 0 auto; display:flex; align-items:center; gap:10px; padding: 6px 18px 10px; }
+  .header-row .backbtn{ background:#F1F2F5; }
+  .header-row .hdr-wordmark{ font-size:17px; }
+
+  .scroll-area{ flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch; padding: 0 18px 28px; }
+  .scroll-area::-webkit-scrollbar{ display:none; }
+
+  .searchbar{
+    padding:1.25px; border-radius:999px; background:var(--grad); margin-bottom:14px;
+  }
+  .searchbar > .inner{
+    display:flex; align-items:flex-start; gap:9px; background:#fff; border-radius:999px;
+    padding:11px 15px; font-size:12px; color:var(--ink-2); line-height:1.45;
+  }
+
+  .card{
+    background:var(--card); border:1px solid var(--line); border-radius:var(--radius);
+    padding:14px 16px; margin-bottom:12px;
+  }
+  .card h3{ margin:0 0 10px; font-size:13px; font-weight:800; color:var(--ink); display:flex; align-items:center; gap:7px; }
+  .card h3 .tag{
+    display:inline-flex; align-items:center; gap:4px;
+    font-size:10px; font-weight:800; padding:2.5px 8px; border-radius:999px;
+    background:var(--grad); color:#fff;
+  }
+
+  .cond-row{ display:flex; align-items:flex-start; gap:8px; padding:6px 0; font-size:12.5px; }
+  .cond-row .stat{
+    flex:0 0 auto; width:18px; height:18px; border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    font-size:11px; font-weight:800; margin-top:1px;
+  }
+  .stat.ok{ background:var(--ok-tint); color:var(--ok); }
+  .stat.hold{ background:var(--hold-tint); color:var(--hold); }
+  .cond-row .txt b{ font-weight:700; }
+  .cond-row .txt span{ color:var(--ink-2); }
+  .cond-row .badge{ font-size:10px; font-weight:800; padding:1px 6px; border-radius:5px; margin-left:6px; }
+  .badge.ok{ color:var(--ok); background:var(--ok-tint); }
+  .badge.hold{ color:var(--hold); background:var(--hold-tint); }
+
+  .chips{ display:flex; flex-wrap:wrap; gap:6px; margin:2px 0 14px; }
+  .chip{
+    font-size:11px; font-weight:700; color:var(--blue); background:var(--blue-tint);
+    padding:6px 11px; border-radius:999px;
+  }
+  .chip.muted{ color:var(--ink-2); background:#F1F2F5; font-weight:600; }
+
+  .section-label{
+    font-size:11.5px; font-weight:800; color:var(--ink-2);
+    margin: 4px 2px 8px; display:flex; align-items:center; justify-content:space-between;
+  }
+
+  .product{
+    display:flex; gap:10px; border:1px solid var(--line); border-radius:14px;
+    padding:12px; margin-bottom:10px; background:var(--card);
+  }
+  .product .thumb{
+    flex:0 0 auto; width:56px; height:56px; border-radius:10px;
+    background: linear-gradient(135deg,#E9EEFB,#F6F8FD);
+    display:flex; align-items:center; justify-content:center; font-size:20px;
+  }
+  .product .body{ flex:1; min-width:0; }
+  .product .name{ font-size:12.5px; font-weight:800; margin-bottom:2px; }
+  .product .price{ font-size:12.5px; margin-bottom:4px; }
+  .product .price .orig{ color:var(--muted); text-decoration:line-through; margin-right:6px; font-weight:500; }
+  .product .price .sale{ color:var(--red); font-weight:800; }
+  .product .meta{ font-size:10.5px; color:var(--muted); margin-bottom:5px; }
+  .product .reason{ font-size:11px; color:var(--ink-2); line-height:1.4; }
+  .product .footer-row{ display:flex; align-items:center; justify-content:space-between; margin-top:7px; }
+  .product .src{ font-size:9.5px; color:var(--blue); font-weight:700; }
+  .buybtn{
+    font-size:10.5px; font-weight:800; color:#fff; background:var(--blue);
+    border:none; border-radius:8px; padding:6px 11px; cursor:pointer;
+    font-family:inherit; white-space:nowrap; flex:0 0 auto;
+  }
+
+  .disclaimer{ font-size:9.5px; color:var(--muted); text-align:center; margin-top:8px; padding-bottom:6px; }
+
+  /* ---------- 구매 후 로컬 섹션 ---------- */
+  #localSection{
+    max-height:0; opacity:0; overflow:hidden;
+    transition: max-height .55s cubic-bezier(.22,.68,0,1), opacity .45s ease;
+  }
+  #localSection.revealed{ max-height:2400px; opacity:1; }
+  .local-inner{ padding-top:14px; border-top:1px dashed var(--line); margin-top:4px; }
+
+  .crossbadge{
+    display:inline-flex; align-items:center; gap:6px;
+    font-size:10.5px; font-weight:800; color:#fff;
+    background:var(--grad); padding:5px 11px; border-radius:999px; margin-bottom:12px;
+  }
+  .local-title{ font-size:17px; font-weight:800; margin: 2px 0 4px; line-height:1.3; }
+  .local-sub{ font-size:12px; color:var(--ink-2); margin-bottom:16px; }
+
+  .course{ border:1px solid var(--line); border-radius:16px; padding:14px; margin-bottom:12px; background:var(--card); }
+  .course .maptag{
+    width:100%; height:74px; border-radius:12px; margin-bottom:10px;
+    background: linear-gradient(135deg,#EAF2FF,#F7FAFF); position:relative; overflow:hidden;
+  }
+  .course .maptag svg{ position:absolute; inset:0; }
+  .course .cname{ font-size:13.5px; font-weight:800; margin-bottom:4px; }
+  .course .cmeta{ font-size:11px; color:var(--muted); margin-bottom:6px; }
+  .course .cmeta span{ margin-right:8px; }
+  .course .cnote{ font-size:11.5px; color:var(--ink-2); line-height:1.4; }
+
+  .loopcta{
+    width:100%; padding:1.5px; border:none; border-radius:14px; background:var(--grad);
+    margin: 6px 0 4px; cursor:pointer; font-family:inherit; display:block;
+  }
+  .loopcta > span{
+    display:block; background:#fff; border-radius:12.5px; padding:12px;
+    font-weight:800; font-size:12.5px; color:var(--ink);
+  }
+  .loophint{ font-size:10.5px; color:var(--muted); text-align:center; margin-bottom:8px; }
+  footer.credit{ font-size:11px; color:var(--muted); margin-top:6px; text-align:center; }
+
+  .toast{
+    position:absolute; left:50%; bottom:22px; transform:translate(-50%,20px);
+    background:#16181D; color:#fff; font-size:11.5px; font-weight:600;
+    padding:10px 16px; border-radius:999px; opacity:0; pointer-events:none;
+    transition: all .3s ease; white-space:nowrap; z-index:40;
+  }
+  .toast.show{ opacity:1; transform:translate(-50%,0); }
+
+  /* ---------- 구매 모달 ---------- */
+  .modal-overlay{
+    position:absolute; inset:0; z-index:30; background:rgba(10,14,20,.45);
+    display:flex; align-items:flex-end; justify-content:center;
+    opacity:0; pointer-events:none; transition:opacity .25s ease;
+  }
+  .modal-overlay.show{ opacity:1; pointer-events:auto; }
+  .modal-sheet{
+    position:relative; width:100%; max-height:82%;
+    background:#fff; border-radius:20px 20px 0 0;
+    padding:24px 20px; overflow-y:auto;
+    transform:translateY(18px); transition:transform .32s cubic-bezier(.22,.68,0,1);
+  }
+  .modal-overlay.show .modal-sheet{ transform:translateY(0); }
+  .modal-icon-ok{
+    width:52px; height:52px; border-radius:50%; margin:2px auto 14px;
+    background:var(--ok-tint); color:var(--ok);
+    display:flex; align-items:center; justify-content:center; font-size:24px; font-weight:800;
+  }
+  .modal-title{ font-size:16px; font-weight:800; text-align:center; margin-bottom:5px; }
+  .modal-sub{ font-size:12px; color:var(--ink-2); text-align:center; margin-bottom:20px; }
+  .modal-btn{
+    width:100%; background:var(--blue); color:#fff; font-weight:800; font-size:13.5px;
+    border:none; border-radius:12px; padding:14px; cursor:pointer; font-family:inherit;
+  }
+
+</style>
+</head>
+<body>
+
+<!-- ===== SVG 심볼 정의 (디자인 시안에서 추출) ===== -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <!-- Daum AI 로고 마크 -->
+    <symbol id="sym-mark" viewBox="198.78 800 23.863 24">
+      <mask id="mk-d" style="mask-type:alpha" maskUnits="userSpaceOnUse" x="198" y="800" width="25" height="24">
+        <path d="M210.214 806.36C213.441 806.36 216.051 809.072 215.926 812.214C215.81 815.202 213.17 817.64 210.073 817.64H205.986C205.713 817.64 205.489 817.424 205.489 817.16V806.84C205.489 806.576 205.713 806.36 205.986 806.36H210.212M210.214 800H200.271C199.449 800 198.78 800.646 198.78 801.44V822.56C198.78 823.354 199.449 824 200.271 824H210.214C217.077 824 222.643 818.626 222.643 812C222.643 805.374 217.077 800 210.214 800Z" fill="white"/>
+      </mask>
+      <g mask="url(#mk-d)">
+        <rect x="198.78" y="800" width="23.863" height="24" fill="url(#mg1)"/>
+        <rect x="198.78" y="800" width="23.863" height="24" fill="url(#mg2)"/>
+        <rect x="198.78" y="800" width="23.863" height="24" fill="url(#mg3)"/>
+        <rect x="198.78" y="800" width="23.863" height="24" fill="url(#mg4)"/>
+        <rect x="198.78" y="800" width="23.863" height="24" fill="url(#mg5)"/>
+      </g>
+    </symbol>
+
+    <!-- 마이크 아이콘 -->
+    <symbol id="sym-mic" viewBox="472.1 800 18.7 24.1">
+      <path d="M488.825 811.884C488.938 811.343 489.467 810.997 490.007 811.109C490.548 811.222 490.894 811.752 490.782 812.292C489.962 816.217 486.605 819.213 482.484 819.63C482.491 819.679 482.498 819.729 482.498 819.78V823.077C482.497 823.629 482.05 824.077 481.498 824.077C480.945 824.077 480.498 823.629 480.498 823.077V819.78C480.498 819.729 480.502 819.679 480.509 819.63C476.389 819.213 473.034 816.217 472.213 812.292C472.101 811.751 472.447 811.222 472.988 811.109C473.528 810.997 474.058 811.343 474.17 811.884C474.858 815.173 477.862 817.682 481.498 817.682C485.133 817.681 488.137 815.173 488.825 811.884ZM481.754 800.007C484.387 800.141 486.481 802.317 486.481 804.983V810.401L486.474 810.657C486.341 813.29 484.164 815.385 481.498 815.385L481.241 815.378C478.693 815.249 476.65 813.205 476.521 810.657L476.514 810.401V804.983C476.514 802.231 478.745 800 481.498 800L481.754 800.007ZM481.498 802C479.85 802 478.514 803.336 478.514 804.983V810.401C478.514 812.049 479.85 813.385 481.498 813.385C483.145 813.385 484.481 812.049 484.481 810.401V804.983C484.481 803.336 483.145 802 481.498 802Z" fill="black" fill-opacity="0.64"/>
+    </symbol>
+
+    <radialGradient id="mg1" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="matrix(19.14 20.52 -14.0565 12.2226 199.153 800.48)">
+      <stop stop-color="#1E84FF"/><stop offset="1" stop-color="#1E84FF"/>
+    </radialGradient>
+    <radialGradient id="mg2" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(205.367 824) rotate(-90) scale(32.76 120.887)">
+      <stop offset="0.0710642" stop-color="#F95F65"/>
+      <stop offset="0.255335" stop-color="#F95F97" stop-opacity="0.85"/>
+      <stop offset="0.488545" stop-color="#E952BE" stop-opacity="0.3"/>
+      <stop offset="0.64993" stop-color="#1E84FF" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="mg3" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="matrix(-8.9486 9.11997 -10.0287 -9.1733 219.66 803.96)">
+      <stop stop-color="#22BB64"/>
+      <stop offset="0.598459" stop-color="#22BBA4" stop-opacity="0.5"/>
+      <stop offset="1" stop-color="#61BACA" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="mg4" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="matrix(-11.9314 -1.91993 2.40277 -13.92 222.643 813.92)">
+      <stop stop-color="#2FD800"/>
+      <stop offset="1" stop-color="#12EB1A" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="mg5" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="matrix(-7.83 -10.2 14.5826 -10.4356 217.796 821.72)">
+      <stop stop-color="#FFC622"/>
+      <stop offset="0.524982" stop-color="#FFC622" stop-opacity="0.6"/>
+      <stop offset="1" stop-color="#FFC622" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+</svg>
+
+<div class="wrap">
+
+  <div class="pagehead">
+    <div class="kicker">DAUM · AI SEARCH CONCEPT</div>
+    <h1>쇼핑, 다음을 이어주는 검색</h1>
+    <p>
+      상품을 찾아주는 것에서 멈추지 않고, 구매 이후의 행동까지 이어주는 검색 경험을 제안합니다.
+      아래 프로토타입은 실제로 클릭해서 <b>홈 → AI 검색 → 결과 → 구매 → 로컬 연결</b>의 5단계 흐름을 확인할 수 있습니다.
+    </p>
+    <div class="metarow">
+      <span class="metachip">클릭 가능한 프로토타입</span>
+      <span class="metachip">390 × 844 (iPhone 기준)</span>
+      <span class="metachip">HTML / CSS / Vanilla JS</span>
+      <span class="metachip">의존성 없음</span>
+    </div>
+  </div>
+
+  <div class="layout">
+
+    <!-- ============ 프로토타입 ============ -->
+    <div class="stage">
+      <div class="phone" id="phone">
+        <div class="statusbar">
+          <span>9:41</span>
+          <span>●●●●&nbsp;&nbsp;🔋</span>
+        </div>
+
+        <div class="viewport">
+
+          <!-- 1. 홈 -->
+          <div class="page active" id="screen-home">
+            <div class="home-inner">
+              <!-- 공식 워드마크 PNG가 있다면 아래 한 줄을 이미지로 교체하세요:
+                   <img class="home-wordmark" src="assets/daum-wordmark.png" alt="Daum" /> -->
+              <div class="home-wordmark wordmark" role="img" aria-label="Daum"><span>D</span><span>a</span><span>u</span><span>m</span></div>
+              <button class="gradpill" id="goIntro">
+                <span class="inner">
+                  <svg class="mark"><use href="#sym-mark"/></svg>
+                  <span class="pill-text fade">찾으시는 상품을 검색해보세요</span>
+                  <svg class="micicon"><use href="#sym-mic"/></svg>
+                </span>
+              </button>
+            </div>
+          </div>
+
+          <!-- 2. 인트로 (AI 검색) -->
+          <div class="page" id="screen-intro">
+            <button class="backbtn intro-back" id="backToHome" aria-label="뒤로">‹</button>
+            <div class="intro-top">
+              <svg class="mark lg"><use href="#sym-mark"/></svg>
+              <p class="intro-h1">
+                찾으시는 상품에 대해 물어보세요.<br>
+                가격, 기능, 상황을 조건으로 자유롭게 말씀해주세요.<br>
+                상품을 찾는 것에서 그치지 않고, 다음까지 이어드릴게요.
+              </p>
+            </div>
+            <div class="intro-bottom">
+              <button class="gradpill lg" id="goResults">
+                <span class="inner">
+                  <span class="pill-text q"><span id="typedQuery">초보자가 신을만한 러닝화 구매하려고 해 근데, 무릎이 아프지 말아야 하고 가격은 10만 원 중후반대로 골라줘</span><span class="caret" id="queryCaret" aria-hidden="true"></span></span>
+                  <svg class="micicon"><use href="#sym-mic"/></svg>
+                </span>
+              </button>
+              <div class="intro-disclaimer">다음 AI는 실수를 할 수 있습니다. 응답을 다시 한번 확인해주세요.</div>
+            </div>
+          </div>
+
+          <!-- 3. 검색 결과 -->
+          <div class="page" id="screen-search">
+            <div class="header-row">
+              <button class="backbtn" id="backToIntro" aria-label="뒤로">‹</button>
+              <div class="hdr-wordmark wordmark" role="img" aria-label="Daum"><span>D</span><span>a</span><span>u</span><span>m</span></div>
+            </div>
+            <div class="scroll-area">
+              <div class="searchbar">
+                <span class="inner">
+                  <svg class="mark" style="width:16px;height:16px;margin-top:1px"><use href="#sym-mark"/></svg>
+                  <span>초보자가 신을만한 러닝화 구매하려고 해 근데, 무릎이 아프지 말아야 하고 가격은 10만 원 중후반대로 골라줘</span>
+                </span>
+              </div>
+
+              <div class="card">
+                <h3><span class="tag">AI 답변</span>조건을 이렇게 반영했어요</h3>
+                <div class="cond-row">
+                  <div class="stat ok">✓</div>
+                  <div class="txt"><b>무릎 충격흡수</b><span class="badge ok">확인</span><br><span>쿠셔닝 등급이 표기된 제품 우선 반영</span></div>
+                </div>
+                <div class="cond-row">
+                  <div class="stat ok">✓</div>
+                  <div class="txt"><b>초보자용 안정화</b><span class="badge ok">확인</span><br><span>미드솔 안정화 구조 적용 제품만 포함</span></div>
+                </div>
+                <div class="cond-row">
+                  <div class="stat hold">–</div>
+                  <div class="txt"><b>내구성</b><span class="badge hold">보류</span><br><span>스펙 정보가 없어 추정하지 않았어요</span></div>
+                </div>
+              </div>
+
+              <div class="section-label">내 조건 <span style="font-weight:600;color:var(--muted);">후속 질문에도 유지돼요</span></div>
+              <div class="chips">
+                <span class="chip">무릎 충격흡수</span>
+                <span class="chip">초보자용</span>
+                <span class="chip">10만원대 후반</span>
+              </div>
+
+              <div class="section-label">근거 · 상품 제안</div>
+
+              <div class="product">
+                <div class="thumb">👟</div>
+                <div class="body">
+                  <div class="name">A사 안정화 러닝화 3세대</div>
+                  <div class="price"><span class="orig">178,000원</span><span class="sale">168,000원</span></div>
+                  <div class="meta">무료배송 · ★4.8(1,204) · 러너스라운지</div>
+                  <div class="reason">쿠셔닝 등급 최상급, 초보자 안정화 구조로 무릎 부담을 줄여줘요</div>
+                  <div class="footer-row">
+                    <div class="src">출처 · 상품 스펙 / 판매처 ↗</div>
+                    <button class="buybtn" onclick="openPurchaseModal('A사 안정화 러닝화 3세대','168,000원')">바로구매</button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="product">
+                <div class="thumb">👟</div>
+                <div class="body">
+                  <div class="name">B사 쿠션 러닝화</div>
+                  <div class="price"><span class="orig">189,000원</span><span class="sale">175,000원</span></div>
+                  <div class="meta">무료배송 · ★4.7(892) · 마라톤스토어</div>
+                  <div class="reason">두꺼운 쿠셔닝으로 착지 충격을 흡수, 안정화 보정 기능 포함</div>
+                  <div class="footer-row">
+                    <div class="src">출처 · 상품 스펙 / 판매처 ↗</div>
+                    <button class="buybtn" onclick="openPurchaseModal('B사 쿠션 러닝화','175,000원')">바로구매</button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="product">
+                <div class="thumb">👟</div>
+                <div class="body">
+                  <div class="name">C사 입문용 러닝화</div>
+                  <div class="price"><span class="sale">165,000원</span></div>
+                  <div class="meta">배송비 2,500원 · ★4.6(650) · 스포츠데포</div>
+                  <div class="reason">가볍고 안정적인 초보자용 구조, 예산 안에서 균형 잡힌 선택</div>
+                  <div class="footer-row">
+                    <div class="src">출처 · 상품 스펙 / 판매처 ↗</div>
+                    <button class="buybtn" onclick="openPurchaseModal('C사 입문용 러닝화','165,000원')">바로구매</button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="section-label">선택 기준</div>
+              <div class="chips">
+                <span class="chip muted">쿠션감</span>
+                <span class="chip muted">안정성</span>
+                <span class="chip muted">발볼 너비</span>
+                <span class="chip muted">무게</span>
+              </div>
+
+              <div class="disclaimer">Daum은 중개자입니다. 상품 정보는 판매처 기준이에요.</div>
+
+              <!-- 구매 완료 후에만 열리는 섹션 -->
+              <div id="localSection">
+                <div class="local-inner">
+                  <div class="crossbadge">쇼핑 → 로컬로 이어졌어요</div>
+                  <div class="local-title">이 신발로 뛰기 좋은 코스</div>
+                  <div class="local-sub">고른 러닝화 기준으로 초보자에게 부담 없는 코스를 골랐어요</div>
+
+                  <div class="course">
+                    <div class="maptag"><svg viewBox="0 0 300 74"><path d="M10 55 Q 80 15, 150 40 T 290 20" stroke="#1E84FF" stroke-width="3" fill="none" stroke-linecap="round"/></svg></div>
+                    <div class="cname">노들섬 러닝 코스</div>
+                    <div class="cmeta"><span>4.2km</span><span>난이도 쉬움</span><span>평지 위주</span></div>
+                    <div class="cnote">그늘이 많고 노면이 평탄해 무릎 부담이 적은 입문자 추천 코스예요</div>
+                  </div>
+
+                  <div class="course">
+                    <div class="maptag"><svg viewBox="0 0 300 74"><path d="M10 20 Q 90 60, 160 30 T 290 50" stroke="#1E84FF" stroke-width="3" fill="none" stroke-linecap="round"/></svg></div>
+                    <div class="cname">여의도 벚꽃길 코스</div>
+                    <div class="cmeta"><span>5.5km</span><span>난이도 쉬움</span><span>야간 조명 좋음</span></div>
+                    <div class="cnote">완전 평지 코스라 착지 충격이 적고, 밤에도 안전하게 뛸 수 있어요</div>
+                  </div>
+
+                  <button class="loopcta"><span>완주하고 인증샷 남기기</span></button>
+                  <div class="loophint">완주 인증은 루프 탭에서 공유할 수 있어요</div>
+                  <footer class="credit">쇼핑에서 시작해 로컬로 — 검색이 다음 행동으로 이어지는 순간</footer>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <div class="toast" id="toast">인증 챌린지로 연결돼요 (데모)</div>
+
+        <div class="modal-overlay" id="modal">
+          <div class="modal-sheet" id="modalSheet"></div>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+</div>
+
+<script>
+  const toast = document.getElementById('toast');
+  const localSection = document.getElementById('localSection');
+  const modal = document.getElementById('modal');
+  const modalSheet = document.getElementById('modalSheet');
+
+  function goToPage(id){
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+    if (id === 'screen-intro') startTyping(); else stopTyping();
+  }
+
+  /* ---- 인트로 검색창 타이핑 인터랙션 ---- */
+  const typedEl = document.getElementById('typedQuery');
+  const caretEl = document.getElementById('queryCaret');
+  const QUERY = typedEl.textContent;
+  const CHAR_MS = 42;      // 글자당 간격
+  const START_MS = 420;    // 화면 전환이 끝난 뒤 시작
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let typeDelay = null, typeTimer = null;
+
+  function stopTyping(){
+    clearTimeout(typeDelay); clearInterval(typeTimer);
+    typeDelay = typeTimer = null;
+  }
+
+  function startTyping(){
+    stopTyping();
+    if (reduceMotion){                       // 모션 최소화 설정이면 즉시 완성
+      typedEl.textContent = QUERY;
+      caretEl.classList.add('on');
+      return;
+    }
+    typedEl.textContent = '';
+    caretEl.classList.add('on');
+    let i = 0;
+    typeDelay = setTimeout(() => {
+      typeTimer = setInterval(() => {
+        typedEl.textContent = QUERY.slice(0, ++i);
+        if (i >= QUERY.length) stopTyping();
+      }, CHAR_MS);
+    }, START_MS);
+  }
+
+  document.getElementById('goIntro').addEventListener('click', () => goToPage('screen-intro'));
+  document.getElementById('goResults').addEventListener('click', () => goToPage('screen-search'));
+  document.getElementById('backToHome').addEventListener('click', () => goToPage('screen-home'));
+  document.getElementById('backToIntro').addEventListener('click', () => goToPage('screen-intro'));
+
+  function showToast(){
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 1800);
+  }
+  document.addEventListener('click', (e) => {
+    if(e.target.closest('.loopcta')) showToast();
+  });
+
+  function openPurchaseModal(productName, price){
+    modalSheet.innerHTML =
+      '<div class="modal-icon-ok">✓</div>' +
+      '<div class="modal-title">구매가 완료됐어요</div>' +
+      '<div class="modal-sub">' + productName + ' · ' + price + '</div>' +
+      '<button class="modal-btn" onclick="confirmPurchase()">확인</button>';
+    modal.classList.add('show');
+  }
+
+  function safeScrollIntoView(el){
+    if (el && typeof el.scrollIntoView === 'function') {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }
+
+  function confirmPurchase(){
+    modal.classList.remove('show');
+    setTimeout(() => {
+      localSection.classList.add('revealed');
+      setTimeout(() => { safeScrollIntoView(localSection); }, 120);
+    }, 280);
+  }
+</script>
+
+</body>
+</html>
