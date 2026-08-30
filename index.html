@@ -316,14 +316,25 @@
   .course .cmeta span{ margin-right:8px; }
   .course .cnote{ font-size:11.5px; color:var(--ink-2); line-height:1.4; }
 
-  .loopcta{
+  .loopcta, .coursecta{
     width:100%; padding:1.5px; border:none; border-radius:14px; background:var(--grad);
     margin: 6px 0 4px; cursor:pointer; font-family:inherit; display:block;
   }
-  .loopcta > span{
+  .loopcta > span, .coursecta > span{
     display:block; background:#fff; border-radius:12.5px; padding:12px;
     font-weight:800; font-size:12.5px; color:var(--ink);
   }
+  .coursecta{ margin: 2px 0 16px; }
+  .coursecta.used{ display:none; }
+  .coursechips{ display:flex; flex-wrap:wrap; gap:7px; margin:2px 0 14px; }
+  .coursechip{
+    font-size:11.5px; font-weight:700; color:var(--ink-2);
+    background:#fff; border:1px solid var(--line); border-radius:999px;
+    padding:8px 13px; cursor:pointer; font-family:inherit; line-height:1.2;
+    transition: color .18s ease, border-color .18s ease, background .18s ease;
+  }
+  .coursechip:hover{ border-color:#C6D0DF; }
+  .coursechip.active{ color:var(--blue); border-color:var(--blue); background:var(--blue-tint); }
   .loophint{ font-size:10.5px; color:var(--muted); text-align:center; margin-bottom:8px; }
   footer.credit{ font-size:11px; color:var(--muted); margin-top:6px; text-align:center; }
 
@@ -537,7 +548,7 @@
                 </div>
                 <div class="cond-row">
                   <div class="stat hold">–</div>
-                  <div class="txt"><b>내구성</b><span class="badge hold">보류</span><br><span>스펙 정보가 부족해 추정하지 않았어요</span></div>
+                  <div class="txt"><b>내구성</b><span class="badge hold">보류</span><br><span>스펙 정보가 없어 추정하지 않았어요</span></div>
                 </div>
               </div>
 
@@ -548,7 +559,7 @@
                 <span class="chip">10만원대 후반</span>
               </div>
 
-              <div class="section-label"> 상품 &근거 제안</div>
+              <div class="section-label">근거 · 상품 제안</div>
 
               <div class="product">
                 <div class="thumb"><img src="assets/shoe-c.jpeg" alt=""></div>
@@ -593,7 +604,7 @@
               </div>
 
               <div class="section-label">선택 기준</div>
-              <div class="section-note">제안한 상품 중에서 아래 기준으로 비교하세요.</div>
+              <div class="section-note">제안한 상품 중에서 아래 기준을 비교해 고르시면 돼요</div>
               <div class="chips">
                 <span class="chip muted">쿠션감</span>
                 <span class="chip muted">안정성</span>
@@ -607,6 +618,10 @@
                 <button class="followup">발볼이 넓은 모델로 좁혀줘</button>
                 <button class="followup">디자인이 심플한 제품으로 추천해줘</button>
               </div>
+
+              <button class="coursecta" id="courseCta">
+                <span>제안된 신발로 뛰기 좋은 코스 보기</span>
+              </button>
 
               <div class="answer-actions">
                 <button aria-label="복사">
@@ -741,6 +756,7 @@
     clearLocalSeq();
     localSection.classList.remove('revealed');   // 다시 검색하면 로컬 섹션도 접습니다
     localInner.innerHTML = '';
+    courseCta.classList.remove('used');           // 코스 보기 버튼도 되살립니다
 
     if (reduceMotion){                            // 모션 최소화 설정이면 즉시 완성
       revealBlocks.forEach(show); condRows.forEach(show);
@@ -752,7 +768,8 @@
     thinking.classList.add('show');
 
     const [card, myLabel, myChips, srcLabel, p1, p2, p3,
-           critLabel, critNote, critChips, fuLabel, fuList, actions, note] = revealBlocks;
+           critLabel, critNote, critChips, fuLabel, fuList,
+           courseCtaEl, actions, note] = revealBlocks;
 
     at(900,  () => show(card));
     condRows.forEach((row, i) => at(1000 + i * 400, () => show(row)));
@@ -765,9 +782,10 @@
     at(3750, () => show(p3));
     at(4100, () => { show(critLabel); show(critNote); show(critChips); });
     at(4300, () => { show(fuLabel); show(fuList); });
-    at(4500, () => show(actions));
-    at(4700, () => { show(note); thinking.classList.remove('show'); });
-    at(5000, () => showHint(visibleBuyBtn(), 0));
+    at(4450, () => show(courseCtaEl));
+    at(4600, () => show(actions));
+    at(4800, () => { show(note); thinking.classList.remove('show'); });
+    at(5100, () => showHint(visibleBuyBtn(), 0));
   }
 
   /* ---- 클릭 지점 안내 (손 커서) ---- */
@@ -858,6 +876,10 @@
     toastTimer = setTimeout(() => toast.classList.remove('show'), 1800);
   }
   document.addEventListener('click', (e) => {
+    if (e.target.closest('.coursecta'))             // 구매 없이 코스 보기 (첫 상품 기준)
+      return runLocalSequence('a', 'preview');
+    const chip = e.target.closest('.coursechip');   // 로컬 섹션 안에서 상품 전환
+    if (chip) return switchCourse(chip.dataset.key);
     if (e.target.closest('.loopcta'))  return showToast('인증 챌린지로 연결돼요 (데모)');
     if (e.target.closest('.followup')) return showToast('후속 질문은 데모에서는 동작하지 않아요');
     const act = e.target.closest('.answer-actions button');
@@ -903,20 +925,39 @@
   };
 
   const localInner = document.getElementById('localInner');
-  let localTimers = [];
+  const courseCta = document.getElementById('courseCta');
+  const PRODUCT_NAMES = {
+    a: 'A사 안정화 러닝화 3세대',
+    b: 'B사 쿠션 러닝화',
+    c: 'C사 입문용 러닝화'
+  };
 
+  let localTimers = [];
   function clearLocalSeq(){ localTimers.forEach(clearTimeout); localTimers = []; }
   function atLocal(ms, fn){ localTimers.push(setTimeout(fn, ms)); }
 
   // 블록을 하나씩 DOM에 붙여서 섹션이 실제로 자라나게 합니다
-  function appendLocal(html){
+  function appendTo(parent, html){
     const box = document.createElement('div');
     box.innerHTML = html.trim();
     const el = box.firstElementChild;
     el.classList.add('reveal');
-    localInner.appendChild(el);
+    parent.appendChild(el);
     requestAnimationFrame(() => el.classList.add('in'));
     return el;
+  }
+
+  // 진행 중인 smooth 스크롤과 겹치면 상대 계산이 어긋나므로 절대 위치를 씁니다
+  function scrollLocalToBottom(){
+    searchArea.scrollTo({ top: searchArea.scrollHeight, behavior: reduceMotion ? 'auto' : 'smooth' });
+  }
+
+  // 섹션을 열 때는 '맨 아래'가 아니라 섹션 머리가 보이는 위치로 한 번만 이동합니다
+  function scrollLocalIntoView(){
+    const top = searchArea.scrollTop
+              + localSection.getBoundingClientRect().top
+              - searchArea.getBoundingClientRect().top - 12;
+    searchArea.scrollTo({ top, behavior: reduceMotion ? 'auto' : 'smooth' });
   }
 
   function courseHTML(c){
@@ -929,51 +970,84 @@
     '</div>';
   }
 
-  /* ---- 로컬 코스 생성 연출 ----
-     구매한 상품을 조건으로 코스를 다시 찾아오는 것처럼 단계별로 붙습니다. */
-  function runLocalSequence(key){
-    clearLocalSeq();
-    const data = COURSES[key] || COURSES.a;
-    localInner.innerHTML = '';
-    localSection.classList.add('revealed');
-
-    const thinkingEl = appendLocal(
-      '<div class="thinking show" style="padding-top:14px">' +
-        '<span class="spinner"></span>' +
-        '<span>구매하신 러닝화 조건으로 코스를 찾고 있어요</span>' +
-      '</div>');
-
-    // 생성 중 표시는 항상 맨 아래에 머뭅니다
-    // 생성 중 표시를 항상 맨 아래로 옮기고, 그 위치까지 따라 내려갑니다.
-    // (상대 계산은 진행 중인 smooth 스크롤과 겹치면 어긋나므로 절대 위치를 씁니다)
-    const scrollToBottom = () => searchArea.scrollTo({
-      top: searchArea.scrollHeight, behavior: reduceMotion ? 'auto' : 'smooth' });
-    const pushBelow = () => { localInner.appendChild(thinkingEl); scrollToBottom(); };
-
-    if (reduceMotion){
-      thinkingEl.remove();
-      appendLocal('<div class="crossbadge">쇼핑 → 로컬로 이어졌어요</div>');
-      appendLocal('<div><div class="local-title">이 신발로 뛰기 좋은 코스</div><div class="local-sub">' + data.sub + '</div></div>');
-      data.items.forEach(c => appendLocal(courseHTML(c)));
-      appendLocal(localFooterHTML());
-      showHint(document.querySelector('.loopcta'), 300);
-      return;
-    }
-
-    atLocal(700,  () => { appendLocal('<div class="crossbadge">쇼핑 → 로컬로 이어졌어요</div>'); pushBelow(); });
-    atLocal(1050, () => { appendLocal('<div><div class="local-title">이 신발로 뛰기 좋은 코스</div><div class="local-sub">' + data.sub + '</div></div>'); pushBelow(); });
-    atLocal(1750, () => { appendLocal(courseHTML(data.items[0])); pushBelow(); });
-    atLocal(2450, () => { appendLocal(courseHTML(data.items[1])); pushBelow(); });
-    atLocal(3100, () => { thinkingEl.remove(); appendLocal(localFooterHTML()); scrollToBottom(); });
-    atLocal(3450, () => showHint(document.querySelector('.loopcta'), 0));
-  }
-
   function localFooterHTML(){
     return '<div>' +
       '<button class="loopcta"><span>완주하고 인증샷 남기기</span></button>' +
       '<div class="loophint">완주 인증은 루프 탭에서 공유할 수 있어요</div>' +
       '<footer class="credit">쇼핑에서 시작해 로컬로 — 검색이 다음 행동으로 이어지는 순간</footer>' +
     '</div>';
+  }
+
+  function chipsHTML(activeKey){
+    return '<div class="coursechips">' + ['a','b','c'].map(k =>
+      '<button class="coursechip' + (k === activeKey ? ' active' : '') + '" data-key="' + k + '">' +
+      PRODUCT_NAMES[k] + '</button>').join('') + '</div>';
+  }
+
+  function setActiveChip(key){
+    localInner.querySelectorAll('.coursechip').forEach(b =>
+      b.classList.toggle('active', b.dataset.key === key));
+  }
+
+  /* ---- 로컬 코스 생성 연출 ----
+     배지·상품 칩은 고정으로 두고, 칩을 바꾸면 아래 결과만 다시 생성됩니다. */
+
+  // 결과 영역(제목·코스·CTA)만 생성. delays로 최초 진입/칩 전환의 속도를 나눕니다.
+  function renderCourseResult(key, mode, delays){
+    clearLocalSeq();
+    const data = COURSES[key] || COURSES.a;
+    const bought = mode === 'purchase';
+    const askMsg = bought ? '구매하신 러닝화 조건으로 코스를 찾고 있어요'
+                          : '제안된 러닝화 조건으로 코스를 찾고 있어요';
+    const titleMsg = bought ? '이 신발로 뛰기 좋은 코스' : '제안된 신발로 뛰기 좋은 코스';
+
+    const result = document.getElementById('courseResult');
+    result.innerHTML = '';
+
+    const thinkingEl = appendTo(result,
+      '<div class="thinking show" style="padding:4px 0 10px">' +
+        '<span class="spinner"></span><span>' + askMsg + '</span>' +
+      '</div>');
+    const pushBelow = () => { result.appendChild(thinkingEl); scrollLocalToBottom(); };
+
+    if (reduceMotion){
+      thinkingEl.remove();
+      appendTo(result, '<div><div class="local-title">' + titleMsg + '</div><div class="local-sub">' + data.sub + '</div></div>');
+      data.items.forEach(c => appendTo(result, courseHTML(c)));
+      appendTo(result, localFooterHTML());
+      showHint(document.querySelector('.loopcta'), 300);
+      return;
+    }
+
+    atLocal(delays[0], () => { appendTo(result, '<div><div class="local-title">' + titleMsg + '</div><div class="local-sub">' + data.sub + '</div></div>'); pushBelow(); });
+    atLocal(delays[1], () => { appendTo(result, courseHTML(data.items[0])); pushBelow(); });
+    atLocal(delays[2], () => { appendTo(result, courseHTML(data.items[1])); pushBelow(); });
+    atLocal(delays[3], () => { thinkingEl.remove(); appendTo(result, localFooterHTML()); scrollLocalToBottom(); });
+    atLocal(delays[4], () => showHint(document.querySelector('.loopcta'), 0));
+  }
+
+  // 섹션을 처음 열 때: 배지 → 칩 → 결과 순으로
+  // mode: 'purchase' = 구매 후 / 'preview' = 구매 없이 제안 상품 기준으로 보기
+  function runLocalSequence(key, mode){
+    clearLocalSeq();
+    courseCta.classList.add('used');        // 섹션이 열리면 버튼은 감춥니다
+    localInner.innerHTML = '';
+    localSection.classList.add('revealed');
+
+    appendTo(localInner, '<div class="crossbadge">쇼핑 → 로컬로 이어졌어요</div>');
+    appendTo(localInner, chipsHTML(key));
+    const result = document.createElement('div');
+    result.id = 'courseResult';
+    localInner.appendChild(result);
+    scrollLocalIntoView();
+
+    renderCourseResult(key, mode, [1050, 1750, 2450, 3100, 3450]);
+  }
+
+  // 칩을 바꿀 때: 배지·칩은 두고 결과만 다시 (조금 더 빠르게)
+  function switchCourse(key){
+    setActiveChip(key);
+    renderCourseResult(key, 'preview', [500, 1100, 1700, 2250, 2550]);
   }
 
   let pendingCourseKey = 'a';
@@ -989,20 +1063,13 @@
     modal.classList.add('show');
   }
 
-  function safeScrollIntoView(el){
-    if (el && typeof el.scrollIntoView === 'function') {
-      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
-  }
-
   // 최초 로드 시 홈 화면 힌트
   showHint(document.getElementById('goIntro'), 900);
 
   function confirmPurchase(){
     modal.classList.remove('show');
     setTimeout(() => {
-      runLocalSequence(pendingCourseKey);       // 구매한 상품 조건으로 코스를 생성
-      setTimeout(() => { safeScrollIntoView(localSection); }, 60);
+      runLocalSequence(pendingCourseKey, 'purchase');   // 스크롤은 runLocalSequence가 담당합니다
     }, 280);
   }
 </script>
