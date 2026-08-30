@@ -718,6 +718,7 @@
   function clearSearchSeq(){
     seqTimers.forEach(clearTimeout);
     seqTimers = [];
+    cancelGentleScroll();
     thinking.classList.remove('show');
   }
   function at(ms, fn){ seqTimers.push(setTimeout(fn, ms)); }
@@ -734,6 +735,32 @@
       });
     }
   }
+
+  /* 브라우저 기본 smooth는 속도를 못 정해서 거리가 길면 급해 보입니다.
+     결과를 다 읽은 뒤 위로 되돌아가는 동작은 직접 이징을 넣어 천천히 움직입니다. */
+  let gentleRAF = null;
+  function cancelGentleScroll(){
+    if (gentleRAF) { cancelAnimationFrame(gentleRAF); gentleRAF = null; }
+  }
+  function gentleScrollTo(target){
+    cancelGentleScroll();
+    const start = searchArea.scrollTop;
+    const delta = target - start;
+    if (reduceMotion || Math.abs(delta) < 2) { searchArea.scrollTop = target; return; }
+    // 거리에 비례하되 너무 느리거나 빠르지 않게
+    const duration = Math.min(1400, Math.max(600, Math.abs(delta) * 2.2));
+    const t0 = performance.now();
+    const easeInOutCubic = t => t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t + 2, 3) / 2;
+    const step = now => {
+      const p = Math.min(1, (now - t0) / duration);
+      searchArea.scrollTop = start + delta * easeInOutCubic(p);
+      gentleRAF = p < 1 ? requestAnimationFrame(step) : null;
+    };
+    gentleRAF = requestAnimationFrame(step);
+  }
+  // 사용자가 직접 스크롤하면 즉시 양보합니다
+  ['wheel','touchstart'].forEach(ev =>
+    searchArea.addEventListener(ev, cancelGentleScroll, { passive:true }));
 
   // 등장 + 따라가기
   const show = el => { if (el) { el.classList.add('in'); followScroll(el); } };
@@ -785,7 +812,9 @@
     at(4450, () => show(courseCtaEl));
     at(4600, () => show(actions));
     at(4800, () => { show(note); thinking.classList.remove('show'); });
-    at(5100, () => showHint(visibleBuyBtn(), 0));
+    // 구매가 먼저 눈에 들어와야 하므로, 생성이 끝나면 결과 맨 위로 천천히 돌아갑니다
+    at(4950, () => gentleScrollTo(0));
+    at(6200, () => showHint(visibleBuyBtn(), 0));
   }
 
   /* ---- 클릭 지점 안내 (손 커서) ---- */
@@ -1035,7 +1064,8 @@
     localSection.classList.add('revealed');
 
     appendTo(localInner, '<div class="crossbadge">쇼핑 → 로컬로 이어졌어요</div>');
-    appendTo(localInner, chipsHTML(key));
+    // 구매한 경우엔 이미 신발이 정해졌으므로 상품 칩을 보여주지 않습니다
+    if (mode !== 'purchase') appendTo(localInner, chipsHTML(key));
     const result = document.createElement('div');
     result.id = 'courseResult';
     localInner.appendChild(result);
